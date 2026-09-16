@@ -7,6 +7,7 @@ import '../services/google_auth_services.dart';
 import '../services/apple_auth_services.dart';
 import '../../../core/http/api_client.dart';
 import '../../../core/utils/avatar_url_helper.dart';
+import '../../../core/utils/firebase_messaging_helper.dart';
 import '../../../core/utils/helpers.dart';
 import '../services/auth_service.dart';
 import '../../../core/services/preferences_service.dart';
@@ -74,7 +75,7 @@ class AuthProvider extends ChangeNotifier {
     _loadingMethods[AuthMethod.email] = true;
     notifyListeners();
     try {
-      final firebaseToken = await FirebaseMessaging.instance.getToken();
+      final firebaseToken = await FirebaseMessagingHelper.getTokenSafely();
       final response = await AuthService().login(
         username: email.text.trim(),
         password: password.text.trim(),
@@ -433,7 +434,7 @@ class AuthProvider extends ChangeNotifier {
     _isOtpLoading = true;
     notifyListeners();
     try {
-      final firebaseToken = await FirebaseMessaging.instance.getToken();
+      final firebaseToken = await FirebaseMessagingHelper.getTokenSafely();
       final response = await AuthService().confirmPin(
         username: _otpEmail!,
         pin: pin,

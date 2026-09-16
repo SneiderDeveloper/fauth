@@ -1,6 +1,7 @@
 import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import '../../../core/utils/firebase_messaging_helper.dart';
 import '../services/auth_service.dart';
 
 class MicrosoftAuthService {
@@ -35,7 +36,7 @@ class MicrosoftAuthService {
         throw Exception('Access token nulo en login de Microsoft');
       }
 
-      final firebaseToken = await FirebaseMessaging.instance.getToken();
+      final firebaseToken = await FirebaseMessagingHelper.getTokenSafely();
       final response = await AuthService().loginSocial(
         type: dotenv.env['TYPE_SOCIAL_MICROSOFT']!,
         token: accessToken,
