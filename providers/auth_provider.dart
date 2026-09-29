@@ -41,7 +41,8 @@ class AuthProvider extends ChangeNotifier {
 
   final String appMode;
   final String permissionApp;
-  final Future<Map<String, dynamic>?> Function(int userId, dynamic userData)? verifyUserStatusFn;
+  final Future<Map<String, dynamic>?> Function(int userId, dynamic userData)?
+  verifyUserStatusFn;
 
   AuthProvider({
     required this.appMode,
@@ -70,7 +71,10 @@ class AuthProvider extends ChangeNotifier {
     return initialsUrl;
   }
 
-  Future<void> login(TextEditingController email, TextEditingController password) async {
+  Future<void> login(
+    TextEditingController email,
+    TextEditingController password,
+  ) async {
     _isLoading = true;
     _loadingMethods[AuthMethod.email] = true;
     notifyListeners();
@@ -198,6 +202,8 @@ class AuthProvider extends ChangeNotifier {
       final data = response['data'] is Map ? response['data'] : response;
       final String? token = data?['userToken'];
       final String? expiresIso = data?['expiresIn'];
+      final String? refreshToken = data?['refreshToken'];
+      final String? refreshExpiresIso = data?['refreshExpiresIn'];
       final dynamic userData = data?['userData'];
       if (token == null || token.isEmpty || expiresIso == null) {
         _logger.e("Error cargando datos del backend 163: $token");
@@ -228,7 +234,14 @@ class AuthProvider extends ChangeNotifier {
 
       if (userData != null) {
         ApiClient().setHandlingUnauthorized(false);
-        await ApiClient().saveToken(token, expirationDate);
+        await ApiClient().saveToken(
+          token,
+          expirationDate,
+          refreshToken: refreshToken,
+          refreshExpiresAt: refreshExpiresIso == null
+              ? null
+              : DateTime.parse(refreshExpiresIso).toUtc(),
+        );
         await DeviceTokenService().registerDeviceToken(userData['id']);
         await _validateAndSetUser(userData['id'], userData);
         _startStatusCheck();
