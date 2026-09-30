@@ -36,10 +36,25 @@ class LoginPage extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 32.0),
             child: Column(
               children: [
-                const SizedBox(height: 60),
-
+                const SizedBox(height: 32),
+                const SizedBox(height: 24),
+                Image.network(
+                  'https://app-agione-media-prod-use2-bbgph2ahe2gcg2ee.eastus2-01.azurewebsites.net/api/media/v1/files/download/c8cfd4b0794a4d81984cfd98a854e254',
+                  width: 220,
+                  height: 96,
+                  fit: BoxFit.contain,
+                  semanticLabel: 'Airport Butler',
+                  errorBuilder: (context, error, stackTrace) => Image.asset(
+                    'assets/images/airport_butler_login_logo.png',
+                    width: 220,
+                    height: 96,
+                    fit: BoxFit.contain,
+                    semanticLabel: 'Airport Butler',
+                  ),
+                ),
+                const SizedBox(height: 40),
                 Text(
-                  isAgentsMode ? 'Sign in or sign up' : 'Sign in or sign up',
+                  isAgentsMode ? 'Concierges Sign In' : 'Passenger Sign In',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: titleColor,
@@ -48,22 +63,27 @@ class LoginPage extends StatelessWidget {
                     letterSpacing: -0.5,
                   ),
                 ),
-
-                const SizedBox(height: 40),
-
+                const SizedBox(height: 24),
                 // ── Botones de proveedores sociales ──
                 if (isAgentsMode) ...[
                   // AGENTS: solo Microsoft
                   Wrap(
                     runSpacing: 10,
                     children: [
-                      OutlineButtonProvider(
+                      /*OutlineButtonProvider(
                         label: 'Continue with Microsoft',
                         icon: FontAwesomeIcons.microsoft,
                         iconColor: const Color(0xFF00A4EF),
                         isLoading: authProvider.isMethodLoading(AuthMethod.microsoft),
                         onPressed: () => _handleLogin(context, AuthMethod.microsoft),
                       ),
+                      OutlineButtonProvider(
+                        label: 'Continue with Apple',
+                        icon: FontAwesomeIcons.apple,
+                        iconColor: const Color(0xFF000000),
+                        isLoading: authProvider.isMethodLoading(AuthMethod.apple),
+                        onPressed: () => _handleLogin(context, AuthMethod.apple),
+                      ),*/
                     ],
                   ),
                 ] else ...[
@@ -92,19 +112,19 @@ class LoginPage extends StatelessWidget {
                       //   isLoading: false,
                       //   onPressed: () {},
                       // ),
-                      // OutlineButtonProvider(
-                      //   label: 'Continue with Apple',
-                      //   icon: FontAwesomeIcons.apple,
-                      //   iconColor: const Color(0xFF000000),
-                      //   isLoading: authProvider.isMethodLoading(AuthMethod.apple),
-                      //   onPressed: () => _handleLogin(context, AuthMethod.apple),
-                      // ),
+                      OutlineButtonProvider(
+                         label: 'Continue with Apple',
+                         icon: FontAwesomeIcons.apple,
+                         iconColor: const Color(0xFF000000),
+                         isLoading: authProvider.isMethodLoading(AuthMethod.apple),
+                         onPressed: () => _handleLogin(context, AuthMethod.apple),
+                      ),
                     ],
                   ),
                 ],
 
                 // ── Divisor "or" ──
-                const Padding(
+                /*const Padding(
                   padding: EdgeInsets.symmetric(vertical: 16),
                   child: Row(
                     children: [
@@ -124,7 +144,7 @@ class LoginPage extends StatelessWidget {
                       ),
                     ],
                   ),
-                ),
+                ),*/
 
                 // ── Formulario según modo ──
                 if (isAgentsMode)
