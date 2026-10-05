@@ -1,6 +1,3 @@
-import 'dart:io';
-
-import 'package:airport_butler_agents_app/core/widgets/app_web_view/app_web_view_screen.dart';
 import 'package:flutter/material.dart';
 import '/core/widgets/app_button.dart';
 import '../pages/account_recovery.dart';
@@ -11,7 +8,7 @@ import '../routes/auth_route_names.dart';
 import './auth_input_field.dart';
 import '../providers/auth_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../utils/change_password_flow.dart';
 
 class SignInForm extends StatefulWidget {
   const SignInForm({ super.key });
@@ -24,37 +21,12 @@ class _SignInFormState extends State<SignInForm> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  static const String _accountRecoveryPath = '/auth/account-recovery';
-  static const String _loginRedirectUrl = 'abconcierges://login';
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
-  }
-
-  void _openChangePasswordPage(BuildContext context) {
-    final baseUri = Uri.tryParse(dotenv.env['API_ROUTE'] ?? '');
-    if (baseUri == null || !baseUri.hasScheme) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to open change password page')),
-      );
-      return;
-    }
-
-    final device = Platform.isIOS ? 'apple' : 'android';
-    final uri = baseUri.replace(
-      path: '${baseUri.path}/',
-      fragment: '$_accountRecoveryPath?device=$device',
-    );
-
-    AppWebViewScreen.navigateTo(
-      context,
-      url: uri.toString(),
-      title: 'Change Password',
-      redirectUrls: const [_loginRedirectUrl],
-    );
   }
 
   @override
@@ -119,7 +91,7 @@ class _SignInFormState extends State<SignInForm> {
           ),
           const SizedBox(height: 12),
           GestureDetector(
-            onTap: () => _openChangePasswordPage(context),
+            onTap: () => ChangePasswordFlow.open(context),
             child: const Text(
               'I´ve forgotten my password',
               style: TextStyle(
