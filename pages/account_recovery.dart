@@ -3,6 +3,7 @@ import '/core/widgets/navigation_app_bar.dart';
 import '/core/widgets/app_button.dart';
 import '../widgets/auth_input_field.dart';
 
+// TO-DO: Remove the deprecated view; it has been replaced by a redirect to the website
 class AccountRecovery extends StatefulWidget {
   const AccountRecovery({ super.key });
 
