@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '/core/widgets/app_button.dart';
-import '../pages/account_recovery.dart';
 import '../pages/create_account.dart';
 import '../pages/otp_page.dart';
 import 'package:go_router/go_router.dart';
