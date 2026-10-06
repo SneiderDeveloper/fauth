@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:project_airport_butler_passenger_app/core/widgets/app_web_view/app_web_view_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class TermsAndPrivacyNotice extends StatelessWidget {
   const TermsAndPrivacyNotice({ super.key });
 
   static const String _accountDeletionPath = '/auth/account-deletion';
+  static const String _termsOfServiceUrl = 'https://airportbutler.com/terms-and-conditions/';
+  static const String _privacyPolicyUrl = 'https://airportbutler.com/privacy-policy/';
 
   @override
   Widget build(BuildContext context) {
@@ -21,9 +24,25 @@ class TermsAndPrivacyNotice extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _footerLink('Terms of Service', linkColor),
+            _footerLink(
+              'Terms of Service',
+              linkColor,
+              onTap: () => AppWebViewScreen.navigateTo(
+                context,
+                url: _termsOfServiceUrl,
+                title: 'Terms of Service',
+              ),
+            ),
             const Text(' and ', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-            _footerLink('Privacy Policy', linkColor),
+            _footerLink(
+              'Privacy Policy',
+              linkColor,
+              onTap: () => AppWebViewScreen.navigateTo(
+                context,
+                url: _privacyPolicyUrl,
+                title: 'Privacy Policy',
+              ),
+            ),
           ],
         ),
       ],
