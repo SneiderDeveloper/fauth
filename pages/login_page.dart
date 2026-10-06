@@ -127,6 +127,7 @@ class LoginPage extends StatelessWidget {
                         width: 10,
                       )
                     ],
+
                   ),
                 ],
 
@@ -154,6 +155,7 @@ class LoginPage extends StatelessWidget {
                 ),*/
 
                 // ── Formulario según modo ──
+                const SizedBox(height: 20),
                 if (isAgentsMode)
                   const SignInForm()   // Email + Password + Sign In
                 else
