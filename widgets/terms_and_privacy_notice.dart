@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:project_airport_butler_passenger_app/core/widgets/app_web_view/app_web_view_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '/core/widgets/app_web_view/app_web_view_screen.dart';
 
 class TermsAndPrivacyNotice extends StatelessWidget {
   const TermsAndPrivacyNotice({ super.key });
