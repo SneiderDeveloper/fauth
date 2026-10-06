@@ -291,12 +291,14 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     try {
       _stopStatusCheck();
-      await AuthService().logout();
-      await ApiClient().deleteTokens();
-      _user = null;
+      if (await ApiClient().getToken() != null) {
+        await AuthService().logout();
+      }
     } catch (e) {
       _logger.e("Error during logout", error: e);
     } finally {
+      await ApiClient().deleteTokens();
+      _user = null;
       notifyListeners();
     }
   }
