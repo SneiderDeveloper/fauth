@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -27,6 +28,8 @@ class LoginPage extends StatelessWidget {
     final String authType =
         (dotenv.maybeGet('AUTH_TYPE') ?? 'PASSENGER').toUpperCase().trim();
     final bool isAgentsMode = authType == 'AGENTS';
+    final bool isIOS =
+        !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -112,13 +115,17 @@ class LoginPage extends StatelessWidget {
                       //   isLoading: false,
                       //   onPressed: () {},
                       // ),
-                      OutlineButtonProvider(
-                         label: 'Continue with Apple',
-                         icon: FontAwesomeIcons.apple,
-                         iconColor: const Color(0xFF000000),
-                         isLoading: authProvider.isMethodLoading(AuthMethod.apple),
-                         onPressed: () => _handleLogin(context, AuthMethod.apple),
-                      ),
+                      if (isIOS)
+                        OutlineButtonProvider(
+                          label: 'Continue with Apple',
+                          icon: FontAwesomeIcons.apple,
+                          iconColor: const Color(0xFF000000),
+                          isLoading: authProvider.isMethodLoading(AuthMethod.apple),
+                          onPressed: () => _handleLogin(context, AuthMethod.apple),
+                        ),
+                      SizedBox(
+                        width: 10,
+                      )
                     ],
 
                   ),
