@@ -27,6 +27,7 @@ class AuthProvider extends ChangeNotifier {
   Timer? _resendTimer;
   bool _isOtpLoading = false;
   String? _otpEmail;
+  int _socialLoginRequestId = 0;
 
   dynamic get user => _user;
   bool get isAuthenticated => _user != null;
@@ -145,6 +146,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> loginSocial(AuthMethod type) async {
+    final currentRequestId = ++_socialLoginRequestId;
     _isLoading = true;
     _loadingMethods[type] = true;
     notifyListeners();
@@ -152,13 +154,22 @@ class AuthProvider extends ChangeNotifier {
       dynamic response;
       switch (type) {
         case AuthMethod.microsoft:
-          response = await MicrosoftAuthService.instance.login();
+          response = await MicrosoftAuthService.instance.login().timeout(
+            const Duration(seconds: 90),
+            onTimeout: () => throw Exception('Login timeout - Please try again'),
+          );
           break;
         case AuthMethod.google:
-          response = await GoogleAuthService.instance.login();
+          response = await GoogleAuthService.instance.login().timeout(
+            const Duration(seconds: 90),
+            onTimeout: () => throw Exception('Login timeout - Please try again'),
+          );
           break;
         case AuthMethod.apple:
-          response = await AppleAuthService.instance.login();
+          response = await AppleAuthService.instance.login().timeout(
+            const Duration(seconds: 90),
+            onTimeout: () => throw Exception('Login timeout - Please try again'),
+          );
           break;
         default:
           showNativeSnackBar(
@@ -174,22 +185,28 @@ class AuthProvider extends ChangeNotifier {
     } catch (e, stack) {
       _user = null;
       _logger.f("Social login failed", error: e, stackTrace: stack);
-      
+
       // Mejora de mensajes de error específicos
-      String errorMessage = "Social Login Failed";
-      if (e.toString().contains("localhost")) {
+      final rawError = e.toString().replaceFirst('Exception: ', '');
+      _logger.e("Social login detailed error: $rawError");
+
+      String errorMessage = rawError;
+      if (rawError.contains("localhost")) {
         errorMessage = "OAuth configuration error - Please verify redirect URI settings";
-      } else if (e.toString().contains("timeout")) {
+      } else if (rawError.toLowerCase().contains("timeout")) {
         errorMessage = "Login timeout - Please try again";
-      } else if (e.toString().contains("cancelled")) {
+      } else if (rawError.toLowerCase().contains("cancelled")) {
         errorMessage = "Login was cancelled";
-      } else if (e.toString().contains("access token")) {
+      } else if (rawError.toLowerCase().contains("access token")) {
         errorMessage = "Failed to obtain access token - Check your credentials";
+      } else if (errorMessage.isEmpty) {
+        errorMessage = "Social Login Failed";
       }
-      
+
       showNativeSnackBar(errorMessage, Colors.redAccent);
       rethrow;
     } finally {
+      if (currentRequestId != _socialLoginRequestId) return;
       _isLoading = false;
       _loadingMethods[type] = false;
       notifyListeners();
