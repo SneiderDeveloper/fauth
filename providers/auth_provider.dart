@@ -134,6 +134,7 @@ class AuthProvider extends ChangeNotifier {
         await logout();
       };
 
+      await _restoreCachedSession();
       await initializeAuthenticatedUser();
     } catch (e) {
       _logger.e("Error en carga inicial: $e");
@@ -274,29 +275,47 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _validateAndSetUser(int userId, dynamic userData) async {
     if (verifyUserStatusFn != null) {
+      // Network errors propagate so callers can keep the session while offline.
       final validatedUser = await verifyUserStatusFn!(userId, userData);
       if (validatedUser != null && hasAccess(permissionApp, userData)) {
-        _user = validatedUser;
+        _setUser(validatedUser);
         unawaited(DeviceTokenService().registerDeviceToken(userId));
       } else {
         await logout();
       }
     } else {
-      _user = userData;
+      _setUser(userData);
       unawaited(DeviceTokenService().registerDeviceToken(userId));
     }
+    notifyListeners();
+  }
+
+  void _setUser(dynamic user) {
+    _user = user;
+    if (user is Map) {
+      unawaited(ApiClient().saveCachedUser(Map<String, dynamic>.from(user)));
+    }
+  }
+
+  /// Restores the last known user when a token is stored locally, so the
+  /// session survives app restarts without internet connection. The backend
+  /// validation runs afterwards in [initializeAuthenticatedUser].
+  Future<void> _restoreCachedSession() async {
+    final token = await ApiClient().getToken();
+    if (token == null || token.isEmpty) return;
+
+    final cachedUser = await ApiClient().readCachedUser();
+    if (cachedUser == null || !hasAccess(permissionApp, cachedUser)) return;
+
+    _user = cachedUser;
+    _isInitialLoading = false;
     notifyListeners();
   }
 
   void _startStatusCheck() {
     _statusCheckTimer?.cancel();
     _statusCheckTimer = Timer.periodic(const Duration(minutes: 10), (timer) {
-      if (_user != null && _user is Map) {
-        final userId = _user['id'];
-        if (userId != null) {
-          unawaited(initializeAuthenticatedUser());
-        }
-      }
+      unawaited(initializeAuthenticatedUser());
     });
   }
 
@@ -373,6 +392,16 @@ class AuthProvider extends ChangeNotifier {
       await _validateAndSetUser(userData['id'], userData);
       _startStatusCheck();
     } catch (e, stackTrace) {
+      if (isNetworkOrServerUnavailableError(e)) {
+        // No definitive backend answer: keep the local session alive and retry later.
+        _logger.w(
+          "Unable to validate session (offline or server unavailable). Keeping session.",
+          error: e,
+        );
+        _startStatusCheck();
+        return;
+      }
+
       _logger.e(
         "Error validating session and access",
         error: e,
@@ -517,7 +546,7 @@ class AuthProvider extends ChangeNotifier {
   void updateUser(Map<String, dynamic> updates) {
     print('updateUser $updates');
     if (_user != null && _user is Map) {
-      _user = {..._user, ...updates};
+      _setUser({..._user, ...updates});
       notifyListeners();
     }
   }
