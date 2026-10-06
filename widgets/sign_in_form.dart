@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '/core/widgets/app_button.dart';
-import '../pages/account_recovery.dart';
 import '../pages/create_account.dart';
 import '../pages/otp_page.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +7,7 @@ import '../routes/auth_route_names.dart';
 import './auth_input_field.dart';
 import '../providers/auth_provider.dart';
 import 'package:provider/provider.dart';
+import '../utils/change_password_flow.dart';
 
 class SignInForm extends StatefulWidget {
   const SignInForm({ super.key });
@@ -90,9 +90,7 @@ class _SignInFormState extends State<SignInForm> {
           ),
           const SizedBox(height: 12),
           GestureDetector(
-            onTap: () {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const AccountRecovery()));
-            },
+            onTap: () => ChangePasswordFlow.open(context),
             child: const Text(
               'I´ve forgotten my password',
               style: TextStyle(
