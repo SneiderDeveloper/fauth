@@ -1,6 +1,6 @@
-import 'package:flutter/cupertino.dart';
+import 'dart:io';
+
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../../core/utils/firebase_messaging_helper.dart';
 import 'auth_service.dart';
@@ -15,9 +15,14 @@ class GoogleAuthService {
 
   Future<GoogleSignIn> _buildGoogleSignIn() async {
     final googleSignIn = GoogleSignIn.instance;
+    final iosClientId =
+        dotenv.env['GOOGLE_IOS_CLIENT_ID'] ?? dotenv.env['GOOGLE_WEB_CLIENT_ID'];
+    final webClientId = dotenv.env['GOOGLE_WEB_CLIENT_ID'];
+
     if (!_initialized) {
       await googleSignIn.initialize(
-        serverClientId: dotenv.env['GOOGLE_CLIENT_ID'],
+        clientId: Platform.isIOS ? iosClientId : null,
+        serverClientId: Platform.isAndroid ? webClientId : null,
       );
       _initialized = true;
     }
