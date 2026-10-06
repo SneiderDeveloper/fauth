@@ -8,6 +8,33 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:uuid/uuid.dart';
 import 'auth_service.dart';
 
+String normalizeApplePrivateKey(String value) {
+  const header = '-----BEGIN PRIVATE KEY-----';
+  const footer = '-----END PRIVATE KEY-----';
+  final normalized = value.trim().replaceAll(r'\n', '\n');
+
+  if (!normalized.startsWith(header) || !normalized.endsWith(footer)) {
+    throw const FormatException(
+      'APPLE_PRIVATE_KEY is not a valid PEM private key',
+    );
+  }
+
+  final body = normalized
+      .substring(header.length, normalized.length - footer.length)
+      .replaceAll(RegExp(r'\s+'), '');
+  if (body.isEmpty) {
+    throw const FormatException('APPLE_PRIVATE_KEY has no key data');
+  }
+
+  final lines = <String>[];
+  for (var offset = 0; offset < body.length; offset += 64) {
+    final end = (offset + 64 < body.length) ? offset + 64 : body.length;
+    lines.add(body.substring(offset, end));
+  }
+
+  return '$header\n${lines.join('\n')}\n$footer';
+}
+
 class AppleAuthService {
   static final AppleAuthService instance = AppleAuthService._internal();
   AppleAuthService._internal();
@@ -27,17 +54,18 @@ class AppleAuthService {
       {
         'iss': teamId,
         'iat': DateTime.now().millisecondsSinceEpoch ~/ 1000,
-        'exp': DateTime.now().add(const Duration(minutes: 5)).millisecondsSinceEpoch ~/ 1000,
+        'exp':
+            DateTime.now()
+                .add(const Duration(minutes: 5))
+                .millisecondsSinceEpoch ~/
+            1000,
         'aud': 'https://appleid.apple.com',
         'sub': clientId,
       },
       header: {'alg': 'ES256', 'kid': keyId},
     );
 
-    return jwt.sign(
-      ECPrivateKey(privateKey),
-      algorithm: JWTAlgorithm.ES256,
-    );
+    return jwt.sign(ECPrivateKey(privateKey), algorithm: JWTAlgorithm.ES256);
   }
 
   Future<dynamic> login() async {
@@ -65,7 +93,7 @@ class AppleAuthService {
       teamId: appleTeamId,
       clientId: appleClientId,
       keyId: appleKeyId,
-      privateKey: applePrivateKey.replaceAll(r'\n', '\n'),
+      privateKey: normalizeApplePrivateKey(applePrivateKey),
     );
 
     try {
@@ -111,7 +139,8 @@ class AppleAuthService {
       // Apple solo envía el nombre (y a veces el email) en el `user`
       // (JSON string) del response de `authorize`, y únicamente la
       // PRIMERA vez que el usuario autoriza esta app. No viene en el id_token.
-      final rawUser = authorizationResponse.authorizationAdditionalParameters?['user'];
+      final rawUser =
+          authorizationResponse.authorizationAdditionalParameters?['user'];
       Map<String, dynamic>? appleUser;
       if (rawUser != null) {
         try {
