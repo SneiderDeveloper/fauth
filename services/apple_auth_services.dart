@@ -1,171 +1,100 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
-import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_appauth/flutter_appauth.dart';
-import '../../../core/utils/firebase_messaging_helper.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:logger/logger.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:uuid/uuid.dart';
+import '../../../core/utils/firebase_messaging_helper.dart';
 import 'auth_service.dart';
 
-String normalizeApplePrivateKey(String value) {
-  const header = '-----BEGIN PRIVATE KEY-----';
-  const footer = '-----END PRIVATE KEY-----';
-  final normalized = value.trim().replaceAll(r'\n', '\n');
-
-  if (!normalized.startsWith(header) || !normalized.endsWith(footer)) {
-    throw const FormatException(
-      'APPLE_PRIVATE_KEY is not a valid PEM private key',
-    );
-  }
-
-  final body = normalized
-      .substring(header.length, normalized.length - footer.length)
-      .replaceAll(RegExp(r'\s+'), '');
-  if (body.isEmpty) {
-    throw const FormatException('APPLE_PRIVATE_KEY has no key data');
-  }
-
-  final lines = <String>[];
-  for (var offset = 0; offset < body.length; offset += 64) {
-    final end = (offset + 64 < body.length) ? offset + 64 : body.length;
-    lines.add(body.substring(offset, end));
-  }
-
-  return '$header\n${lines.join('\n')}\n$footer';
-}
-
+/// Servicio de autenticación con Apple usando el SDK **nativo**
+/// (`ASAuthorizationController` en iOS). A diferencia del flujo web OAuth
+/// (flutter_appauth), este no depende de un `redirect_uri` http(s), por lo que
+/// no sufre el problema de `ASWebAuthenticationSession` que nunca retorna el
+/// control a la app (Apple exige que el `callbackURLScheme` NO sea http/https,
+/// pero nuestro backend solo puede registrar un `redirect_uri` https ante
+/// Apple). El resultado (identityToken) se envía igual al backend mediante
+/// `AuthService().loginSocial(type: 'apple', ...)`.
 class AppleAuthService {
   static final AppleAuthService instance = AppleAuthService._internal();
   AppleAuthService._internal();
 
-  static const FlutterAppAuth _appAuth = FlutterAppAuth();
+  final Logger _logger = Logger(printer: PrettyPrinter(methodCount: 0));
 
-  /// Apple exige un `client_secret` (JWT firmado con ES256) en el intercambio
-  /// del código de autorización. Sin él, el token endpoint de Apple responde
-  /// con `invalid_client` (código 2001).
-  String _generateClientSecret({
-    required String teamId,
-    required String clientId,
-    required String keyId,
-    required String privateKey,
-  }) {
-    final jwt = JWT(
-      {
-        'iss': teamId,
-        'iat': DateTime.now().millisecondsSinceEpoch ~/ 1000,
-        'exp':
-            DateTime.now()
-                .add(const Duration(minutes: 5))
-                .millisecondsSinceEpoch ~/
-            1000,
-        'aud': 'https://appleid.apple.com',
-        'sub': clientId,
-      },
-      header: {'alg': 'ES256', 'kid': keyId},
-    );
-
-    return jwt.sign(ECPrivateKey(privateKey), algorithm: JWTAlgorithm.ES256);
+  String _mapAppleAuthError(Object error) {
+    if (error is SignInWithAppleAuthorizationException) {
+      switch (error.code) {
+        case AuthorizationErrorCode.canceled:
+          return 'Login was cancelled';
+        case AuthorizationErrorCode.failed:
+          return 'Apple authorization failed: ${error.message}';
+        case AuthorizationErrorCode.invalidResponse:
+          return 'Apple returned an invalid response: ${error.message}';
+        case AuthorizationErrorCode.notHandled:
+          return 'Apple authorization was not handled: ${error.message}';
+        case AuthorizationErrorCode.notInteractive:
+          return 'Apple authorization requires user interaction';
+        case AuthorizationErrorCode.unknown:
+          return 'Unknown Apple authorization error: ${error.message}';
+      }
+    }
+    return error.toString().replaceFirst('Exception: ', '').trim();
   }
 
   Future<dynamic> login() async {
-    final String? appleClientId = dotenv.env['APPLE_CLIENT_ID'];
-    final String? appleRedirectUri = dotenv.env['APPLE_REDIRECT_URI'];
-    final String? appleTeamId = dotenv.env['APPLE_TEAM_ID'];
-    final String? appleKeyId = dotenv.env['APPLE_KEY_ID'];
-    final String? applePrivateKey = dotenv.env['APPLE_PRIVATE_KEY'];
-
-    if (appleClientId == null || appleRedirectUri == null) {
-      throw Exception('Apple configuration missing in .env');
-    }
-
-    if (appleTeamId == null || appleKeyId == null || applePrivateKey == null) {
-      throw Exception(
-        'Apple configuration missing in .env: APPLE_TEAM_ID, APPLE_KEY_ID and APPLE_PRIVATE_KEY are required to generate the client_secret',
-      );
-    }
-
-    // Apple requiere un nonce para validar la identidad
+    // Apple requiere un nonce para validar la identidad del `identityToken`.
     final rawNonce = const Uuid().v4();
     final nonce = sha256.convert(utf8.encode(rawNonce)).toString();
 
-    final clientSecret = _generateClientSecret(
-      teamId: appleTeamId,
-      clientId: appleClientId,
-      keyId: appleKeyId,
-      privateKey: normalizeApplePrivateKey(applePrivateKey),
-    );
-
     try {
-      // Android construye internamente el token request con
-      // createTokenExchangeRequest() y no permite inyectar additionalParameters
-      // ahí dentro de authorizeAndExchangeCode. Apple requiere client_secret
-      // en el body. Por eso se hace en 2 pasos: authorize -> token.
-      final authorizationResponse = await _appAuth.authorize(
-        AuthorizationRequest(
-          appleClientId,
-          appleRedirectUri,
-          issuer: 'https://appleid.apple.com',
-          scopes: ['openid', 'email', 'name'],
-          nonce: nonce,
-          responseMode: 'form_post',
-        ),
-      );
-
-      final authorizationCode = authorizationResponse.authorizationCode;
-      if (authorizationCode == null) {
-        throw Exception('No authorization code received from Apple');
+      final isAvailable = await SignInWithApple.isAvailable();
+      if (!isAvailable) {
+        throw Exception(
+          'Sign in with Apple is not available on this device/OS version',
+        );
       }
 
-      final result = await _appAuth.token(
-        TokenRequest(
-          appleClientId,
-          appleRedirectUri,
-          issuer: 'https://appleid.apple.com',
-          scopes: ['openid', 'email', 'name'],
-          nonce: authorizationResponse.nonce,
-          authorizationCode: authorizationCode,
-          codeVerifier: authorizationResponse.codeVerifier,
-          additionalParameters: {'client_secret': clientSecret},
-        ),
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: nonce,
       );
 
-      final String? token = result.idToken ?? result.accessToken;
-
-      if (token == null) {
+      final String? identityToken = credential.identityToken;
+      if (identityToken == null || identityToken.isEmpty) {
         throw Exception('No identity token received from Apple');
       }
 
-      // Apple solo envía el nombre (y a veces el email) en el `user`
-      // (JSON string) del response de `authorize`, y únicamente la
-      // PRIMERA vez que el usuario autoriza esta app. No viene en el id_token.
-      final rawUser =
-          authorizationResponse.authorizationAdditionalParameters?['user'];
-      Map<String, dynamic>? appleUser;
-      if (rawUser != null) {
-        try {
-          appleUser = jsonDecode(rawUser) as Map<String, dynamic>;
-        } catch (_) {
-          appleUser = null;
-        }
-      }
+      // Apple solo envía el nombre (y a veces el email) la PRIMERA vez que el
+      // usuario autoriza esta app. No viene en identityToken en logins
+      // posteriores.
+      final appleUser = <String, dynamic>{
+        if (credential.email != null) 'email': credential.email,
+        if (credential.givenName != null || credential.familyName != null)
+          'name': {
+            if (credential.givenName != null) 'firstName': credential.givenName,
+            if (credential.familyName != null) 'lastName': credential.familyName,
+          },
+      };
 
       final firebaseToken = await FirebaseMessagingHelper.getTokenSafely();
       final response = await AuthService().loginSocial(
         type: 'apple',
-        token: token,
+        token: identityToken,
         firebaseToken: firebaseToken,
         socialData: {
-          'idToken': result.idToken,
-          'accessToken': result.accessToken,
-          'refreshToken': result.refreshToken,
+          'idToken': identityToken,
+          'authorizationCode': credential.authorizationCode,
           'rawNonce': rawNonce, // Algunos backends necesitan el nonce original
-          if (appleUser != null) 'user': appleUser,
+          if (appleUser.isNotEmpty) 'user': appleUser,
         },
       );
       return response;
-    } catch (e) {
-      throw Exception('Apple login error: ${e.toString()}');
+    } catch (e, stack) {
+      final message = _mapAppleAuthError(e);
+      _logger.e('Apple login error', error: e, stackTrace: stack);
+      Error.throwWithStackTrace(Exception(message), stack);
     }
   }
 }

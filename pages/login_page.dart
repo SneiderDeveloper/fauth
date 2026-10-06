@@ -12,8 +12,10 @@ class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
 
   Future<void> _handleLogin(BuildContext context, AuthMethod type) async {
+    final authProvider = context.read<AuthProvider>();
+    if (authProvider.isMethodLoading(type)) return;
     try {
-      await context.read<AuthProvider>().loginSocial(type);
+      await authProvider.loginSocial(type);
     } catch (e) {
       debugPrint('Error en login: $e');
     }
