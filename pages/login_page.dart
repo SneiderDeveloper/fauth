@@ -120,6 +120,7 @@ class LoginPage extends StatelessWidget {
                          onPressed: () => _handleLogin(context, AuthMethod.apple),
                       ),
                     ],
+
                   ),
                 ],
 
@@ -147,6 +148,7 @@ class LoginPage extends StatelessWidget {
                 ),*/
 
                 // ── Formulario según modo ──
+                const SizedBox(height: 20),
                 if (isAgentsMode)
                   const SignInForm()   // Email + Password + Sign In
                 else
