@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import '../services/microsoft_auth_service.dart';
@@ -23,7 +24,7 @@ class AuthProvider extends ChangeNotifier {
   bool _isInitialLoading = true;
   bool _hasSeenWelcome = false;
   Timer? _statusCheckTimer;
-  int _resendSeconds = 120;
+  final ValueNotifier<int> _resendSecondsNotifier = ValueNotifier<int>(120);
   Timer? _resendTimer;
   bool _isOtpLoading = false;
   String? _otpEmail;
@@ -35,10 +36,14 @@ class AuthProvider extends ChangeNotifier {
   bool isMethodLoading(AuthMethod method) => _loadingMethods[method] ?? false;
   bool get isInitialLoading => _isInitialLoading;
   bool get hasSeenWelcome => _hasSeenWelcome;
-  int get resendSeconds => _resendSeconds;
+  /// Ticks every second during the OTP countdown. Listen to this instead of the
+  /// provider so the tick doesn't rebuild every AuthProvider listener (router,
+  /// proxy providers, screens...).
+  ValueListenable<int> get resendSecondsListenable => _resendSecondsNotifier;
+  int get resendSeconds => _resendSecondsNotifier.value;
   bool get isOtpLoading => _isOtpLoading;
   String? get otpEmail => _otpEmail;
-  bool get canResend => _resendSeconds == 0;
+  bool get canResend => resendSeconds == 0;
 
   final String appMode;
   final String permissionApp;
@@ -455,20 +460,7 @@ class AuthProvider extends ChangeNotifier {
         final int? retryAfter = data['retry_after_seconds'] as int?;
 
         if (retryAfter != null && retryAfter > 0) {
-          _resendSeconds = retryAfter;
-
-          _resendTimer?.cancel();
-          _resendTimer = Timer.periodic(
-            const Duration(seconds: 1),
-                (timer) {
-              if (_resendSeconds > 0) {
-                _resendSeconds--;
-                notifyListeners();
-              } else {
-                timer.cancel();
-              }
-            },
-          );
+          _startResendCountdown(retryAfter);
         }
       }
     } catch (e, stackTrace) {
@@ -530,15 +522,17 @@ class AuthProvider extends ChangeNotifier {
     return raw;
   }
 
-  void startResendTimer() {
-    _resendSeconds = 120;
+  void startResendTimer() => _startResendCountdown(120);
+
+  void _startResendCountdown(int seconds) {
     _resendTimer?.cancel();
+    _resendSecondsNotifier.value = seconds;
     _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_resendSeconds > 0) {
-        _resendSeconds--;
+      if (_resendSecondsNotifier.value > 0) _resendSecondsNotifier.value--;
+      if (_resendSecondsNotifier.value == 0) {
+        timer.cancel();
+        // canResend changed: a single provider notification at the end.
         notifyListeners();
-      } else {
-        _resendTimer?.cancel();
       }
     });
   }
@@ -555,6 +549,7 @@ class AuthProvider extends ChangeNotifier {
   void dispose() {
     _stopStatusCheck();
     _resendTimer?.cancel();
+    _resendSecondsNotifier.dispose();
     super.dispose();
   }
 }
