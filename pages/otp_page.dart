@@ -211,19 +211,26 @@ class _OtpPageState extends State<OtpPage> {
                         ),
                       ),
                     const SizedBox(height: 50),
-                    TextButton(
-                      onPressed: (_pin.isNotEmpty || authProvider.canResend) ? _resendCode : null,
-                      child: Text(
-                        _pin.isNotEmpty || authProvider.canResend
-                            ? 'RESEND CODE NOW'
-                            : 'RESEND CODE IN ${authProvider.resendSeconds}s',
-                        style: TextStyle(
-                          color: (_pin.isNotEmpty || authProvider.canResend) ? linkBlue : Colors.grey.withOpacity(0.6),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
+                    // Only this button rebuilds on each countdown tick.
+                    ValueListenableBuilder<int>(
+                      valueListenable: authProvider.resendSecondsListenable,
+                      builder: (context, resendSeconds, _) {
+                        final canResend = _pin.isNotEmpty || resendSeconds == 0;
+                        return TextButton(
+                          onPressed: canResend ? _resendCode : null,
+                          child: Text(
+                            canResend
+                                ? 'RESEND CODE NOW'
+                                : 'RESEND CODE IN ${resendSeconds}s',
+                            style: TextStyle(
+                              color: canResend ? linkBlue : Colors.grey.withOpacity(0.6),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 24),
                     GestureDetector(
